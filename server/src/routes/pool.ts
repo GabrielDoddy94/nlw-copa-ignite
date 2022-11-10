@@ -43,7 +43,7 @@ export async function poolRoutes(fastify: FastifyInstance) {
   });
 
   fastify.post(
-    "/pools/:id/join",
+    "/pools/join",
     { onRequest: [authenticate] },
     async (request, reply) => {
       const joinPoolBody = z.object({
@@ -67,12 +67,12 @@ export async function poolRoutes(fastify: FastifyInstance) {
 
       if (!pool) {
         return reply.status(400).send({
-          message: "Pool not found",
+          message: "Pool not found.",
         });
       }
 
       if (pool.participants.length > 0) {
-        return reply.send({
+        return reply.status(400).send({
           message: "You already joined this pool.",
         });
       }
@@ -138,44 +138,52 @@ export async function poolRoutes(fastify: FastifyInstance) {
     return { pools };
   });
 
-  fastify.get("/pools/:id", { onRequest: [authenticate] }, async request => {
-    const getPoolParams = z.object({
-      id: z.string(),
-    });
+  fastify.get(
+    "/pools/:poolId",
+    { onRequest: [authenticate] },
+    async (request, reply) => {
+      const getPoolParams = z.object({
+        poolId: z.string(),
+      });
 
-    const { id } = getPoolParams.parse(request.params);
+      const { poolId } = getPoolParams.parse(request.params);
 
-    const pool = await prisma.pool.findUnique({
-      where: {
-        id,
-      },
-
-      include: {
-        _count: {
-          select: {
-            participants: true,
-          },
+      const pool = await prisma.pool.findUnique({
+        where: {
+          id: poolId,
         },
-        participants: {
-          select: {
-            id: true,
-            user: {
-              select: {
-                avatarUrl: true,
-              },
+
+        include: {
+          _count: {
+            select: {
+              participants: true,
             },
           },
-          take: 4,
-        },
-        owner: {
-          select: {
-            id: true,
-            name: true,
+          participants: {
+            select: {
+              id: true,
+              user: {
+                select: {
+                  avatarUrl: true,
+                },
+              },
+            },
+            take: 4,
+          },
+          owner: {
+            select: {
+              id: true,
+              name: true,
+            },
           },
         },
-      },
-    });
+      });
 
-    return { pool };
-  });
+      if (!pool) {
+        return reply.status(400).send({ message: "Pool not found." });
+      }
+
+      return { pool };
+    }
+  );
 }
